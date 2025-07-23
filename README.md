@@ -32,7 +32,7 @@ ft0317a_ceiling_fan_light/
 
 ## Hardware Requirements
 
-- **Sonoff RF Bridge R2** - RF 433MHz transceiver with "direct hack" modification (requires soldering and cutting some traces)
+- **Sonoff RF Bridge R2** - RF 433MHz transceiver with "direct hack" modification ([instructions here](https://github.com/xoseperez/espurna/wiki/Hardware-Itead-Sonoff-RF-Bridge---Direct-Hack)) - requires soldering and cutting some traces
 - **FT0317A Remote Control** - (optional) Original remote ([FCC documentation and manual](https://device.report/shenzhen-funpower-general-technology/ft0317a))
 - **Compatible Ceiling Fan** - Fan with built-in light supporting FT0317A remote
 
