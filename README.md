@@ -9,6 +9,8 @@ The integration consists of two main components that work together to provide se
 1. **ESPHome Configuration** for Sonoff RF Bridge R2 - Acts as a simple RF gateway that transmits received codes and reports original remote codes to Home Assistant
 2. **Home Assistant Configuration** - Provides comprehensive entities and automation for complete fan and light control
 
+> **Example Compatible Device**: This integration was developed and tested with the [GONEO Bladeless Ceiling Fan Light](https://www.goneoglobal.com/collections/ceiling-fan-light/products/bladeless-ceiling-fan-light) (Model: F19A), which uses the FT0317A remote control. Many other compatible devices likely exist, as these ceiling fans are primarily manufactured in China and widely available on platforms like AliExpress with the same FT0317A remote.
+
 ## Limitations
 
 - **Timer Functions**: The original remote's timer features (1h, 4h, 8h) are not currently supported
@@ -31,6 +33,8 @@ ft0317a_ceiling_fan_light/
 ## Hardware Requirements
 
 - **Sonoff RF Bridge R2** - RF 433MHz transceiver with "direct hack" modification (requires soldering and cutting some traces)
+- **FT0317A Remote Control** - (optional) Original remote ([FCC documentation and manual](https://device.report/shenzhen-funpower-general-technology/ft0317a))
+- **Compatible Ceiling Fan** - Fan with built-in light supporting FT0317A remote
 
 ## Setup Instructions
 
@@ -92,7 +96,7 @@ The integration maintains comprehensive state tracking through:
 
 ## Credits
 
-This project was almost completely vibe coded. Most likely it could be done much better but it's good enough in my terms. The RF code transmission functionality was inspired by the excellent work of [@alm4096/Arlec-DC-Ceiling-Fan-Remote-FT0317A-Arduino](https://github.com/alm4096/Arlec-DC-Ceiling-Fan-Remote-FT0317A-Arduino).
+This project was completely "vibe coded" using AI tools. While there's room for improvement, it serves its purpose effectively. The RF code transmission functionality was inspired by the excellent work of [@alm4096/Arlec-DC-Ceiling-Fan-Remote-FT0317A-Arduino](https://github.com/alm4096/Arlec-DC-Ceiling-Fan-Remote-FT0317A-Arduino).
 
 ## License
 
