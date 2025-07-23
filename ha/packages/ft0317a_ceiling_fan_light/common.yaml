@@ -1,0 +1,386 @@
+rf_common:
+  template:
+    - sensor:
+      # Template sensors returning RF codes for automation triggers and scripts
+      # Fan codes
+      - name: "RF Code Fan Toggle A"
+        state: "0001010001001001000101110000010100000101"
+        icon: mdi:fan
+      - name: "RF Code Fan Toggle B"
+        state: "0001010001001001000101110100010101000101"
+        icon: mdi:fan
+      - name: "RF Code Fan Speed 1 A"
+        state: "0001010001001001000101110000001100000011"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 1 B"
+        state: "0001010001001001000101110100001101000011"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 2 A"
+        state: "0001010001001001000101110000010000000100"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 2 B"
+        state: "0001010001001001000101110100010001000100"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 3 A"
+        state: "0001010001001001000101110000100000001000"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 3 B"
+        state: "0001010001001001000101110100100001001000"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 4 A"
+        state: "0001010001001001000101110000011100000111"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 4 B"
+        state: "0001010001001001000101110100011101000111"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 5 A"
+        state: "0001010001001001000101110000011000000110"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 5 B"
+        state: "0001010001001001000101110100011001000110"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 6 A"
+        state: "0001010001001001000101110000001000000010"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Speed 6 B"
+        state: "0001010001001001000101110100001001000010"
+        icon: mdi:speedometer
+      - name: "RF Code Fan Breeze A"
+        state: "0001010001001001000101110000000100000001"
+        icon: mdi:weather-windy
+      - name: "RF Code Fan Breeze B"
+        state: "0001010001001001000101110100000101000001"
+        icon: mdi:weather-windy
+      # Light codes
+      - name: "RF Code Light Toggle A"
+        state: "0001010001001001000101110000110100001101"
+        icon: mdi:lightbulb
+      - name: "RF Code Light Toggle B"
+        state: "0001010001001001000101110100110101001101"
+        icon: mdi:lightbulb
+      - name: "RF Code Light Brightness Up A"
+        state: "0001010001001001000101110000111000001110"
+        icon: mdi:brightness-plus
+      - name: "RF Code Light Brightness Up B"
+        state: "0001010001001001000101110100111001001110"
+        icon: mdi:brightness-plus
+      - name: "RF Code Light Brightness Down A"
+        state: "0001010001001001000101110000110000001100"
+        icon: mdi:brightness-minus
+      - name: "RF Code Light Brightness Down B"
+        state: "0001010001001001000101110100110001001100"
+        icon: mdi:brightness-minus
+      - name: "RF Code Light Temperature A"
+        state: "0001010001001001000101110000111100001111"
+        icon: mdi:thermometer
+      - name: "RF Code Light Temperature B"
+        state: "0001010001001001000101110100111101001111"
+        icon: mdi:thermometer
+
+  automation:
+    - id: rf_universal_code_handler
+      alias: "RF Universal - Code Handler"
+      description: "Universal handler for all RF codes - determines action and executes appropriate service"
+      mode: parallel
+      max: 10
+      trigger:
+        - platform: event
+          event_type: esphome.ft0317a_rf_code_received
+      variables:
+        received_code: "{{ trigger.event.data.raw_code }}"
+        # Map received codes to actions (using only B codes for triggers)
+        code_action_map:
+          "{{ states('sensor.rf_code_fan_toggle_b') }}": "fan_toggle"
+          "{{ states('sensor.rf_code_fan_speed_1_b') }}": "fan_speed_1"
+          "{{ states('sensor.rf_code_fan_speed_2_b') }}": "fan_speed_2"
+          "{{ states('sensor.rf_code_fan_speed_3_b') }}": "fan_speed_3"
+          "{{ states('sensor.rf_code_fan_speed_4_b') }}": "fan_speed_4"
+          "{{ states('sensor.rf_code_fan_speed_5_b') }}": "fan_speed_5"
+          "{{ states('sensor.rf_code_fan_speed_6_b') }}": "fan_speed_6"
+          "{{ states('sensor.rf_code_fan_breeze_b') }}": "fan_breeze"
+          "{{ states('sensor.rf_code_light_toggle_b') }}": "light_toggle"
+          "{{ states('sensor.rf_code_light_brightness_up_b') }}": "light_brightness_up"
+          "{{ states('sensor.rf_code_light_brightness_down_b') }}": "light_brightness_down"
+          "{{ states('sensor.rf_code_light_temperature_b') }}": "light_temperature"
+        action: "{{ code_action_map.get(received_code, 'unknown') }}"
+      condition:
+        - condition: template
+          value_template: "{{ action != 'unknown' }}"
+      action:
+        - choose:
+          # Fan actions
+          - conditions:
+              - condition: template
+                value_template: "{{ action == 'fan_toggle' }}"
+            sequence:
+              - service: input_boolean.toggle
+                target:
+                  entity_id: input_boolean.rf_ceiling_fan_state
+          - conditions:
+              - condition: template
+                value_template: "{{ action.startswith('fan_speed_') }}"
+            sequence:
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.rf_ceiling_fan_preset_mode
+                data:
+                  option: "speed {{ action.split('_')[-1] }}"
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.rf_ceiling_fan_state
+          - conditions:
+              - condition: template
+                value_template: "{{ action == 'fan_breeze' }}"
+            sequence:
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.rf_ceiling_fan_preset_mode
+                data:
+                  option: "breeze"
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.rf_ceiling_fan_state
+          # Light actions
+          - conditions:
+              - condition: template
+                value_template: "{{ action == 'light_toggle' }}"
+            sequence:
+              - service: input_boolean.toggle
+                target:
+                  entity_id: input_boolean.rf_ceiling_light_state
+          - conditions:
+              - condition: template
+                value_template: "{{ action == 'light_brightness_up' }}"
+            sequence:
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.rf_ceiling_light_brightness
+                data:
+                  value: "{{ [states('input_number.rf_ceiling_light_brightness') | int + 1, 50] | min }}"
+          - conditions:
+              - condition: template
+                value_template: "{{ action == 'light_brightness_down' }}"
+            sequence:
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.rf_ceiling_light_brightness
+                data:
+                  value: "{{ [states('input_number.rf_ceiling_light_brightness') | int - 1, 1] | max }}"
+          - conditions:
+              - condition: template
+                value_template: "{{ action == 'light_temperature' }}"
+            sequence:
+              - service: input_select.select_next
+                target:
+                  entity_id: input_select.rf_ceiling_light_temperature
+                data:
+                  cycle: true
+
+  button:
+    - name: "RF Device Reset"
+      icon: mdi:restart
+      press:
+        - service: script.rf_device_reset
+
+  script:
+    rf_send_code:
+      alias: "RF - Send RF Code"
+      description: "Universal script for sending RF codes for light and fan control"
+      mode: queued
+      fields:
+        action:
+          description: "Action key: light_toggle, light_brightness_up, light_brightness_down, light_temperature, fan_toggle, fan_speed_1, fan_speed_2, fan_speed_3, fan_speed_4, fan_speed_5, fan_speed_6, fan_breeze"
+          required: true
+      variables:
+        # Map action to sensor names for code retrieval
+        action_sensor_map:
+          light_toggle:
+            code_a_sensor: "sensor.rf_code_light_toggle_a"
+            code_b_sensor: "sensor.rf_code_light_toggle_b"
+          light_brightness_up:
+            code_a_sensor: "sensor.rf_code_light_brightness_up_a"
+            code_b_sensor: "sensor.rf_code_light_brightness_up_b"
+          light_brightness_down:
+            code_a_sensor: "sensor.rf_code_light_brightness_down_a"
+            code_b_sensor: "sensor.rf_code_light_brightness_down_b"
+          light_temperature:
+            code_a_sensor: "sensor.rf_code_light_temperature_a"
+            code_b_sensor: "sensor.rf_code_light_temperature_b"
+          fan_toggle:
+            code_a_sensor: "sensor.rf_code_fan_toggle_a"
+            code_b_sensor: "sensor.rf_code_fan_toggle_b"
+          fan_speed_1:
+            code_a_sensor: "sensor.rf_code_fan_speed_1_a"
+            code_b_sensor: "sensor.rf_code_fan_speed_1_b"
+          fan_speed_2:
+            code_a_sensor: "sensor.rf_code_fan_speed_2_a"
+            code_b_sensor: "sensor.rf_code_fan_speed_2_b"
+          fan_speed_3:
+            code_a_sensor: "sensor.rf_code_fan_speed_3_a"
+            code_b_sensor: "sensor.rf_code_fan_speed_3_b"
+          fan_speed_4:
+            code_a_sensor: "sensor.rf_code_fan_speed_4_a"
+            code_b_sensor: "sensor.rf_code_fan_speed_4_b"
+          fan_speed_5:
+            code_a_sensor: "sensor.rf_code_fan_speed_5_a"
+            code_b_sensor: "sensor.rf_code_fan_speed_5_b"
+          fan_speed_6:
+            code_a_sensor: "sensor.rf_code_fan_speed_6_a"
+            code_b_sensor: "sensor.rf_code_fan_speed_6_b"
+          fan_breeze:
+            code_a_sensor: "sensor.rf_code_fan_breeze_a"
+            code_b_sensor: "sensor.rf_code_fan_breeze_b"
+        code_a: "{{ states(action_sensor_map[action].code_a_sensor) }}"
+        code_b: "{{ states(action_sensor_map[action].code_b_sensor) }}"
+      sequence:
+        - service: esphome.sonoff_rf_bridge_send_ft0317a_rf_code
+          data:
+            code_a: "{{ code_a }}"
+            code_b: "{{ code_b }}"
+
+    rf_device_reset:
+      alias: "RF Device Reset"
+      description: "Reset RF ceiling fan and light to known state with automatic restoration"
+      mode: single
+      variables:
+        # Save current states before reset
+        original_fan_state: "{{ states('input_boolean.rf_ceiling_fan_state') }}"
+        original_fan_preset: "{{ states('input_select.rf_ceiling_fan_preset_mode') }}"
+        original_light_state: "{{ states('input_boolean.rf_ceiling_light_state') }}"
+        original_light_brightness: "{{ states('input_number.rf_ceiling_light_brightness') | int }}"
+        original_light_temperature: "{{ states('input_select.rf_ceiling_light_temperature') }}"
+      sequence:
+        # Send notification about manual preparation
+        - service: persistent_notification.create
+          data:
+            title: "RF Device Reset"
+            message: >
+              WARNING: Before continuing:
+              1. Turn on the light (any brightness)
+              2. Set the light to warm color temperature
+              Script will automatically set maximum brightness and fan speed and. Previous settings will be restored when finished.
+            notification_id: "rf_device_reset_preparation"
+        # Wait for user to prepare the device manually
+        - delay:
+            seconds: 8
+        # Clear the notification
+        - service: persistent_notification.dismiss
+          data:
+            notification_id: "rf_device_reset_preparation"
+        
+        # Show progress notification
+        - service: persistent_notification.create
+          data:
+            title: "RF Device Reset - In Progress"
+            message: "Setting maximum light brightness (50 steps)..."
+            notification_id: "rf_device_reset_progress"
+        
+        # Send 50 brightness up commands to ensure maximum brightness
+        - repeat:
+            count: 50
+            sequence:
+              - service: script.rf_send_code
+                data:
+                  action: "light_brightness_up"
+              - delay:
+                  milliseconds: 100
+        
+        # Wait 30 seconds for RF bridge to stabilize
+        - service: persistent_notification.create
+          data:
+            title: "RF Device Reset - Stabilizing"
+            message: "Waiting 30s for RF bridge stabilization..."
+            notification_id: "rf_device_reset_progress"
+        - delay:
+            seconds: 30
+        
+        # Send RF code to set fan to speed 6 (known state)
+        - service: persistent_notification.create
+          data:
+            title: "RF Device Reset - Calibrating"
+            message: "Setting fan to maximum speed..."
+            notification_id: "rf_device_reset_progress"
+        - service: script.rf_send_code
+          data:
+            action: "fan_speed_6"
+        
+        # Update Home Assistant states to match the physical device state
+        - service: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.rf_ceiling_fan_state
+        - service: input_select.select_option
+          target:
+            entity_id: input_select.rf_ceiling_fan_preset_mode
+          data:
+            option: "speed 6"
+        - service: input_number.set_value
+          target:
+            entity_id: input_number.rf_ceiling_light_brightness
+          data:
+            value: 50
+        - service: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.rf_ceiling_light_state
+        - service: input_select.select_option
+          target:
+            entity_id: input_select.rf_ceiling_light_temperature
+          data:
+            option: "warm"
+        
+        # Restore original settings
+        - service: persistent_notification.create
+          data:
+            title: "RF Device Reset - Restoring"
+            message: "Restoring previous settings..."
+            notification_id: "rf_device_reset_progress"
+        
+        # Restore fan settings
+        - if:
+            - condition: template
+              value_template: "{{ original_fan_state == 'off' }}"
+          then:
+            - service: fan.turn_off
+              target:
+                entity_id: fan.rf_ceiling_fan
+          else:
+            - service: fan.set_preset_mode
+              target:
+                entity_id: fan.rf_ceiling_fan
+              data:
+                preset_mode: "{{ original_fan_preset }}"
+        
+        # Restore light settings
+        - if:
+            - condition: template
+              value_template: "{{ original_light_state == 'off' }}"
+          then:
+            - service: light.turn_off
+              target:
+                entity_id: light.rf_ceiling_light
+          else:
+            # Restore brightness
+            - service: script.rf_ceiling_light_set_brightness
+              data:
+                target_brightness: "{{ original_light_brightness }}"
+            # Restore temperature if different
+            - if:
+                - condition: template
+                  value_template: "{{ original_light_temperature != 'warm' }}"
+              then:
+                - service: script.rf_ceiling_light_set_temp
+                  data:
+                    target_mireds: >
+                      {% set temp_map = {'cool': 153, 'neutral': 322, 'warm': 500} %}
+                      {{ temp_map.get(original_light_temperature, 322) }}
+        
+        # Final confirmation notification
+        - service: persistent_notification.create
+          data:
+            title: "RF Device Reset - Complete"
+            message: "Reset completed successfully. Devices have been restored to previous settings."
+            notification_id: "rf_device_reset_complete"
+        - delay:
+            seconds: 5
+        - service: persistent_notification.dismiss
+          data:
+            notification_id: "rf_device_reset_progress" 

@@ -1,0 +1,121 @@
+rf_fan:
+  input_boolean:
+    rf_ceiling_fan_state:
+      name: "Ceiling Fan State"
+      initial: false
+      icon: mdi:fan
+
+  input_select:
+    rf_ceiling_fan_preset_mode:
+      name: "Ceiling Fan Preset Mode"
+      options:
+        - "speed 1"
+        - "speed 2"
+        - "speed 3"
+        - "speed 4"
+        - "speed 5"
+        - "speed 6"
+        - "breeze"
+      initial: "speed 1"
+      icon: mdi:speedometer
+
+  template:
+    - fan:
+      - name: "RF Ceiling Fan"
+        state: "{{ is_state('input_boolean.rf_ceiling_fan_state', 'on') }}"
+        preset_modes:
+          - "off"
+          - "speed 1"
+          - "speed 2"
+          - "speed 3"
+          - "speed 4"
+          - "speed 5"
+          - "speed 6"
+          - "breeze"
+        preset_mode: >
+          {% if is_state('input_boolean.rf_ceiling_fan_state', 'off') %}
+            off
+          {% else %}
+            {{ states('input_select.rf_ceiling_fan_preset_mode') }}
+          {% endif %}
+        percentage: >
+          {% set preset = states('input_select.rf_ceiling_fan_preset_mode') %}
+          {% if is_state('input_boolean.rf_ceiling_fan_state', 'off') %}
+            0
+          {% elif preset == 'breeze' %}
+            100
+          {% elif preset.startswith('speed ') %}
+            {% set speed_num = preset.split(' ')[1] | int %}
+            {{ 100 if speed_num == 6 else speed_num * 16 }}
+          {% else %}
+            0
+          {% endif %}
+        speed_count: 8
+        icon: mdi:fan
+        turn_on:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.rf_ceiling_fan_state
+          - service: script.rf_send_code
+            data:
+              action: "fan_toggle"
+        turn_off:
+          - service: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.rf_ceiling_fan_state
+          - service: script.rf_send_code
+            data:
+              action: "fan_toggle"
+        set_preset_mode:
+          - if:
+              - condition: template
+                value_template: "{{ preset_mode == 'off' }}"
+            then:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.rf_ceiling_fan_state
+              - service: script.rf_send_code
+                data:
+                  action: "fan_toggle"
+            else:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.rf_ceiling_fan_state
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.rf_ceiling_fan_preset_mode
+                data:
+                  option: "{{ preset_mode }}"
+              - service: script.rf_send_code
+                data:
+                  action: >
+                    {% if preset_mode.startswith('speed ') %}
+                      fan_speed_{{ preset_mode.split(' ')[1] }}
+                    {% elif preset_mode == 'breeze' %}
+                      fan_breeze
+                    {% else %}
+                      fan_toggle
+                    {% endif %}
+        set_percentage:
+          - if:
+              - condition: template
+                value_template: "{{ percentage == 0 }}"
+            then:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.rf_ceiling_fan_state
+              - service: script.rf_send_code
+                data:
+                  action: "fan_toggle"
+            else:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.rf_ceiling_fan_state
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.rf_ceiling_fan_preset_mode
+                data:
+                  option: "speed {{ [6, [1, ((percentage + 15) // 16)] | max] | min }}"
+              - service: script.rf_send_code
+                data:
+                  action: "fan_speed_{{ [6, [1, ((percentage + 15) // 16)] | max] | min }}"

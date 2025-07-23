@@ -1,0 +1,148 @@
+rf_fan_light:
+  input_boolean:
+    rf_ceiling_light_state:
+      name: "Ceiling Light State"
+      initial: false
+      icon: mdi:lightbulb
+
+  input_number:
+    rf_ceiling_light_brightness:
+      name: "Ceiling Light Brightness"
+      min: 1
+      max: 50
+      step: 1
+      initial: 1
+      icon: mdi:brightness-6
+
+  input_select:
+    rf_ceiling_light_temperature:
+      name: "Ceiling Light Color Temperature"
+      options:
+        - warm
+        - neutral
+        - cool
+      initial: warm
+      icon: mdi:thermometer
+
+  template:
+    - light:
+      - name: "RF Ceiling Light"
+        state: "{{ is_state('input_boolean.rf_ceiling_light_state', 'on') }}"
+        icon: mdi:lightbulb
+        level: "{{ (states('input_number.rf_ceiling_light_brightness') | int * 255 / 50) | int }}"
+        temperature: >
+          {% set temp_map = {'cool': 153, 'neutral': 322, 'warm': 500} %}
+          {{ temp_map.get(states('input_select.rf_ceiling_light_temperature'), 322) }}
+        min_mireds: 153
+        max_mireds: 500
+        turn_on:
+          - service: script.rf_send_code
+            data:
+              action: "light_toggle"
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.rf_ceiling_light_state
+        turn_off:
+          - service: script.rf_send_code
+            data:
+              action: "light_toggle"
+          - service: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.rf_ceiling_light_state
+        set_temperature:
+          - service: script.rf_ceiling_light_set_temp
+            data:
+              target_mireds: "{{ color_temp }}"
+        set_level:
+          - service: script.rf_ceiling_light_set_brightness
+            data:
+              target_brightness: "{{ ((brightness * 49 / 255) + 1) | int }}"
+
+  script:
+    rf_ceiling_light_set_brightness:
+      alias: "RF Ceiling Light - Set Brightness"
+      description: "Calculate and send RF codes to reach target brightness"
+      mode: single
+      fields:
+        target_brightness:
+          description: "Target brightness level (1-50)"
+          required: true
+      variables:
+        current_brightness: "{{ states('input_number.rf_ceiling_light_brightness') | int }}"
+        target_brightness_int: "{{ target_brightness | int }}"
+        brightness_diff: "{{ target_brightness_int - current_brightness }}"
+        steps_needed: "{{ brightness_diff | abs }}"
+        direction: "{{ 'up' if brightness_diff > 0 else 'down' }}"
+      sequence:
+        - if:
+            - condition: template
+              value_template: "{{ steps_needed > 0 }}"
+          then:
+            - repeat:
+                count: "{{ steps_needed }}"
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ direction == 'up' }}"
+                        sequence:
+                          - service: script.rf_send_code
+                            data:
+                              action: "light_brightness_up"
+                          - delay:
+                              milliseconds: 50
+                          - service: input_number.set_value
+                            target:
+                              entity_id: input_number.rf_ceiling_light_brightness
+                            data:
+                              value: "{{ (states('input_number.rf_ceiling_light_brightness') | int + 1) | int }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ direction == 'down' }}"
+                        sequence:
+                          - service: script.rf_send_code
+                            data:
+                              action: "light_brightness_down"
+                          - delay:
+                              milliseconds: 50
+                          - service: input_number.set_value
+                            target:
+                              entity_id: input_number.rf_ceiling_light_brightness
+                            data:
+                              value: "{{ (states('input_number.rf_ceiling_light_brightness') | int - 1) | int }}"
+
+    rf_ceiling_light_set_temp:
+      alias: "RF Ceiling Light - Set Color Temperature"
+      description: "Calculate and send RF codes to reach target temperature"
+      mode: single
+      fields:
+        target_mireds:
+          description: "Target color temperature in mireds"
+          required: true
+      variables:
+        current_temp: "{{ states('input_select.rf_ceiling_light_temperature') }}"
+        target_temp: "{{ 'cool' if target_mireds <= 237 else ('neutral' if target_mireds <= 411 else 'warm') }}"
+        temp_sequence: ["warm", "neutral", "cool"]
+        current_index: "{{ temp_sequence.index(current_temp) }}"
+        target_index: "{{ temp_sequence.index(target_temp) }}"
+        clicks_needed: >
+          {% set diff = (target_index - current_index) % 3 %}
+          {{ diff if diff != 0 else 0 }}
+      sequence:
+        - if:
+            - condition: template
+              value_template: "{{ clicks_needed > 0 }}"
+          then:
+            - repeat:
+                count: "{{ clicks_needed }}"
+                sequence:
+                  - service: script.rf_send_code
+                    data:
+                      action: "light_temperature"
+                  - delay:
+                      milliseconds: 500
+                  - service: input_select.select_next
+                    target:
+                      entity_id: input_select.rf_ceiling_light_temperature
+                    data:
+                      cycle: true
